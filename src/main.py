@@ -44,16 +44,22 @@ try:
 except (BaseException, Exception):
     traceback.print_exc()
 finally:
-    print("------- Syntax Analysis  - START -------")
+    print("------- Syntax Analysis - START -------")
     write(syntaxRoot, "SyntaxAnalysis")
+    print("Check the result in /treant-js/SyntaxAnalysis.html")
     print("------- Syntax Analysis  - END -------")
 
-    print("------- Semantic Analysis  - START -------")
+    print("------- Semantic Analysis - START -------")
     write(semanticRoot, "SemanticAnalysis")
+    print("Check the result in /treant-js/SemanticAnalysis.html")
     print("------- Semantic Analysis  - END -------")
 
     print("------- Symbol Table - START -------")
+    print("------- Variables - START ------- ")
     pprint(SymbolTable.variables)
+    print("------- Variables - END ------- ")
+    print("------- Functions - START ------- ")
     pprint(SymbolTable.functions)
+    print("------- Functions - END ------- ")
     print("------- Symbol Table - END -------")
 

@@ -13,7 +13,7 @@ func doSomeCalculation() {
     print("6. Pow(4, 5) = ", sixthCal);
 }
 func main() {
-    print("---------Make a choice---------");
+    print("------- Make a choice -------");
     print("1. Call doSomeCalculation() function. ");
     print("2. Do nothing. ");
     let user_input = input("Your choice: ");
