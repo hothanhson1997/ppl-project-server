@@ -1,0 +1,26 @@
+func doSomeCalculation() {
+    let firstCal = (CONST.PI + CONST.E) * 2 / 3 - 4;
+    let secondCal = abs(firstCal);
+    let thirdCal = sin(secondCal);
+    let fourthCal = cos(thirdCal);
+    let fifthCal = tan(fourthCal);
+    let sixthCal = pow(4, 5);
+    print("1. (PI + E) * 2 / 3 - 4 = ", firstCal);
+    print("2. Abs(Expression 1) = ", secondCal);
+    print("3. Sin(Expression 2) = ", thirdCal);
+    print("4. Cos(Expression 3) = ", fourthCal);
+    print("5. Tan(Expression 4) = ", fifthCal);
+    print("6. Pow(4, 5) = ", sixthCal);
+}
+func main() {
+    print("---------Make a choice---------");
+    print("1. Call doSomeCalculation() function. ");
+    print("2. Do nothing. ");
+    let user_input = input("Your choice: ");
+    if (user_input == 1) {
+        doSomeCalculation();
+    } else {
+        print("Nothing to do.");
+    }
+}
+main();
