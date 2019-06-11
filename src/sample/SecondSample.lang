@@ -1,0 +1,12 @@
+func doMath(exp) {
+    if (exp == None):
+      print("ERROR: Expression can not be None!!!");
+    let rs = eval(exp);
+    print(rs);
+}
+func main() {
+    print("------------Calculator-------------");
+    print('Input Expression ( + - * / )');
+    let exp = input('Ex: (2 * 3 + 4 / 5): ');
+    doMath(exp);
+}

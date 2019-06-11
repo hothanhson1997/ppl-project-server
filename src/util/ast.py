@@ -14,6 +14,9 @@
 from rply.token import BaseBox
 from src.common.exceptions import *
 from src.util.jsonParsedTree import *
+from src.common.tokenEnum import *
+from src.common.messageEnum import MessageEnum
+from src.common.constants import AppConstant
 
 
 class Program(BaseBox):
@@ -32,18 +35,17 @@ class Program(BaseBox):
         return self.statements
 
     def eval(self, node):
-        # print("Program<%s> statement's counter: %s" % (self, len(self.statements)))
         result = None
         for i, statement in enumerate(self.statements):
-            left = Node('statement_full')
-            right = Node('program')
-            if i == len(self.statements) - 1:  # If last statement then stop appending Node("program") to the right !
+            left = Node(AppConstant.STATEMENT_FULL_NODE_NAME)
+            right = Node(AppConstant.PROGRAM_NODE_NAME)
+            if i == len(self.statements) - 1:
                 node.children.extend([left])
             else:
                 node.children.extend([left, right])
             node = right
-            result = statement.eval(left)  # Only now the statement.eval(node) does effect !
-        return result  # The result is not been used yet !
+            result = statement.eval(left)
+        return result
 
     def rep(self):
         result = 'Program('
@@ -69,18 +71,17 @@ class Block(BaseBox):
         return self.statements
 
     def eval(self, node):
-        # print("Block<%s> statement's counter: %s" % (self, len(self.statements)))
         result = None
         for i, statement in enumerate(self.statements):
-            left = Node('statement_full')
-            right = Node('block')
-            if i == len(self.statements) - 1:  # If last statement then stop appending Node("block") to the right !
+            left = Node(AppConstant.STATEMENT_FULL_NODE_NAME)
+            right = Node(AppConstant.BLOCK_NODE_NAME)
+            if i == len(self.statements) - 1:
                 node.children.extend([left])
             else:
                 node.children.extend([left, right])
             node = right
-            result = statement.eval(left)  # Only now the statement.eval(node) does effect !
-        return result  # The result is not been used yet !
+            result = statement.eval(left)
+        return result
 
     def rep(self):
         result = 'Block('
@@ -98,14 +99,16 @@ class If(BaseBox):
         self.state = state
 
     def eval(self, node):
-        expression = Node("expression")
-        node.children.extend([Node("IF"), Node("("), expression, Node(")")])
+        expression = Node(AppConstant.EXPRESSION_NODE_NAME)
+        node.children.extend([Node(AppConstant.IF_NODE_NAME), Node('('), expression,
+                              Node(')')])
         condition = self.condition.eval(expression)
-        block = Node("block")
-        node.children.extend([Node("{"), block, Node("}")])
-        else_block = Node("block")
+        block = Node(AppConstant.BLOCK_NODE_NAME)
+        node.children.extend([Node('{'), block, Node('}')])
+        else_block = Node(AppConstant.BLOCK_NODE_NAME)
         if self.else_body is not None:
-            node.children.extend([Node("else"), Node("{"), else_block, Node("}")])
+            node.children.extend([Node(AppConstant.ELSE_NODE_NAME), Node('{'), else_block,
+                                  Node('}')])
         if bool(condition) is True:
             return self.body.eval(block)
         else:
@@ -114,7 +117,7 @@ class If(BaseBox):
         return None
 
     def rep(self):
-        return 'If(%s) Then(%s) Else(%s)' % (self.condition.rep(), self.body.rep(), self.else_body.rep())
+        return AppConstant.IF_ELSE_FUNC_REP % (self.condition.rep(), self.body.rep(), self.else_body.rep())
 
 
 class Variable(BaseBox):
@@ -127,20 +130,20 @@ class Variable(BaseBox):
         return str(self.name)
 
     def eval(self, node):
-        identifier = Node("IDENTIFIER")
-        node.children.extend([identifier])
+        ident_node = Node(TokenEnum.IDENTIFIER.name)
+        node.children.extend([ident_node])
         if dict(self.state.variables).get(self.name) is not None:
             self.value = self.state.variables[self.name]
-            identifier.children.extend([Node(self.name, [Node(self.value)])])
+            ident_node.children.extend([Node(self.name, [Node(self.value)])])
             return self.value
-        identifier.children.extend([Node("Variable <%s> is not yet defined" % str(self.name))])
-        raise LogicError("Variable <%s> is not yet defined" % str(self.name))
+        ident_node.children.extend([Node(MessageEnum.EAST001.value % str(self.name))])
+        raise LogicError(MessageEnum.EAST001.value % str(self.name))
 
     def to_string(self):
         return str(self.name)
 
     def rep(self):
-        return 'Variable(%s)' % self.name
+        return AppConstant.VARIABLE_FUNC_REP % self.name
 
 
 class FunctionDeclaration(BaseBox):
@@ -151,12 +154,14 @@ class FunctionDeclaration(BaseBox):
         state.functions[self.name] = self
 
     def eval(self, node):
-        identifier = Node(self.name)
-        node.children.extend([Node("FUNCTION"), identifier, Node("{"), Node("block"), Node("}")])
+        ident_node = Node(self.name)
+        node.children.extend([Node(TokenEnum.FUNCTION.name), ident_node,
+                              Node('{'), Node(AppConstant.BLOCK_NODE_NAME),
+                              Node('}')])
         return self
 
     def to_string(self):
-        return "<function '%s'>" % self.name
+        return AppConstant.FUNC_DECLARE_REP % self.name
 
 
 class CallFunction(BaseBox):
@@ -166,137 +171,142 @@ class CallFunction(BaseBox):
         self.state = state
 
     def eval(self, node):
-        identifier = Node(self.name + " ( )")
-        node.children.extend([identifier])
-        return self.state.functions[self.name].block.eval(identifier)
+        ident_node = Node(self.name + " ( )")
+        node.children.extend([ident_node])
+        return self.state.functions[self.name].block.eval(ident_node)
 
     def to_string(self):
         return "<call '%s'>" % self.name
 
 
-class BaseFunction(BaseBox):
+class BaseMathFunction(BaseBox):
+
     def __init__(self, expression, state):
         self.expression = expression
         self.value = None
         self.state = state
-        self.roundOffDigits = 10
+        self.max_length = 10
 
     def eval(self, node):
-        raise NotImplementedError("This is abstract method from abstract class BaseFunction(BaseBox){...} !")
+        raise NotImplementedError(MessageEnum.EAST006)
 
     def to_string(self):
         return str(self.value)
 
     def rep(self):
-        return 'BaseFunction(%s)' % self.value
+        return AppConstant.COMMON_FUNCTION_REP % (self.__class__.__name__, self.value)
 
 
-class Absolute(BaseFunction):
+class Absolute(BaseMathFunction):
     def __init__(self, expression, state):
         super().__init__(expression, state)
 
     def eval(self, node):
-        import re as regex
-        expression = Node("expression")
-        node.children.extend([Node("ABSOLUTE"), Node("("), expression, Node(")"), Node(";")])
+        import re
+        expression = Node(AppConstant.EXPRESSION_NODE_NAME)
+        node.children.extend([Node(AppConstant.MATH_ABS_NODE_NAME), Node('('), expression,
+                              Node(')'), Node(AppConstant.SEMI_COLON_SIGN)])
         self.value = self.expression.eval(expression)
-        if regex.search('^-?\d+(\.\d+)?$', str(self.value)):
+        if re.search(AppConstant.NUMERICAL_REGEX, str(self.value)):
             self.value = abs(self.value)
             return self.value
         else:
-            raise ValueError("Cannot abs() not numerical values !")
+            raise ValueError(MessageEnum.EAST002.value % self.__class__.__name__.upper())
 
     def rep(self):
-        return 'Absolute(%s)' % self.value
+        return AppConstant.COMMON_FUNCTION_REP % (self.__class__.__name__, self.value)
 
 
-class Sin(BaseFunction):
+class Sin(BaseMathFunction):
     def __init__(self, expression, state):
         super().__init__(expression, state)
 
     def eval(self, node):
-        import re as regex
-        expression = Node("expression")
-        node.children.extend([Node("SIN"), Node("("), expression, Node(")")])
+        import re
+        import math
+        expression = Node(AppConstant.EXPRESSION_NODE_NAME)
+        node.children.extend([Node(AppConstant.MATH_SIN_NODE_NAME), Node('('), expression,
+                              Node(')')])
         self.value = self.expression.eval(expression)
-        if regex.search('^-?\d+(\.\d+)?$', str(self.value)):
-            import math
-            self.value = round(math.sin(self.value), self.roundOffDigits)
+        if re.search(AppConstant.NUMERICAL_REGEX, str(self.value)):
+            self.value = round(math.sin(self.value), self.max_length)
             return self.value
         else:
-            raise ValueError("Cannot sin() not numerical values !")
+            raise ValueError(MessageEnum.EAST002.value % self.__class__.__name__.upper())
 
     def rep(self):
-        return 'Sin(%s)' % self.value
+        return AppConstant.COMMON_FUNCTION_REP % (self.__class__.__name__, self.value)
 
 
-class Cos(BaseFunction):
+class Cos(BaseMathFunction):
     def __init__(self, expression, state):
         super().__init__(expression, state)
 
     def eval(self, node):
-        import re as regex
-        expression = Node("expression")
-        node.children.extend([Node("COS"), Node("("), expression, Node(")")])
+        import re
+        expression = Node(AppConstant.EXPRESSION_NODE_NAME)
+        node.children.extend([Node(AppConstant.MATH_COS_NODE_NAME), Node('('), expression,
+                              Node(')')])
         self.value = self.expression.eval(expression)
-        if regex.search('^-?\d+(\.\d+)?$', str(self.value)):
+        if re.search(AppConstant.NUMERICAL_REGEX, str(self.value)):
             import math
-            self.value = round(math.cos(self.value), self.roundOffDigits)
+            self.value = round(math.cos(self.value), self.max_length)
             return self.value
         else:
-            raise ValueError("Cannot cos() not numerical values !")
+            raise ValueError(MessageEnum.EAST002.value % self.__class__.__name__.upper())
 
     def rep(self):
-        return 'Cos(%s)' % self.value
+        return AppConstant.COMMON_FUNCTION_REP % (self.__class__.__name__, self.value)
 
 
-class Tan(BaseFunction):
+class Tan(BaseMathFunction):
     def __init__(self, expression, state):
         super().__init__(expression, state)
 
     def eval(self, node):
-        import re as regex
-        expression = Node("expression")
-        node.children.extend([Node("TAN"), Node("("), expression, Node(")")])
+        import re
+        import math
+        expression = Node(AppConstant.EXPRESSION_NODE_NAME)
+        node.children.extend([Node(AppConstant.MATH_TAN_NODE_NAME), Node('('), expression,
+                              Node(')')])
         self.value = self.expression.eval(expression)
-        if regex.search('^-?\d+(\.\d+)?$', str(self.value)):
-            import math
-            self.value = round(math.tan(self.value), self.roundOffDigits)
+        if re.search(AppConstant.NUMERICAL_REGEX, str(self.value)):
+            self.value = round(math.tan(self.value), self.max_length)
             return self.value
         else:
-            raise ValueError("Cannot tan() not numerical values !")
+            raise ValueError(MessageEnum.EAST002.value % self.__class__.__name__.upper())
 
     def rep(self):
-        return 'Tan(%s)' % self.value
+        return AppConstant.COMMON_FUNCTION_REP % (self.__class__.__name__, self.value)
 
 
-class Pow(BaseFunction):
-    def __init__(self, expression, expression2, state):
+class Pow(BaseMathFunction):
+    def __init__(self, expression, sec_expression, state):
         super().__init__(expression, state)
-        self.expression2 = expression2
-        self.value2 = None
+        self.sec_expression = sec_expression
+        self.sec_value = None
 
     def eval(self, node):
-        expression = Node("expression")
-        expression2 = Node("expression")
-        node.children.extend([Node("POWER"), Node("("), expression, Node(","), expression2, Node(")")])
+        import re
+        expression = Node(AppConstant.EXPRESSION_NODE_NAME)
+        sec_expression = Node(AppConstant.EXPRESSION_NODE_NAME)
+        node.children.extend([Node(AppConstant.MATH_POW_NODE_NAME), Node('('), expression,
+                              Node(AppConstant.COMMA_SIGN), sec_expression, Node(')')])
         self.value = self.expression.eval(expression)
-        self.value2 = self.expression2.eval(expression2)
-        import re as regex
-        match1 = regex.search('^-?\d+(\.\d+)?$', str(self.value))
-        match2 = regex.search('^-?\d+(\.\d+)?$', str(self.value2))
-        if match1 and match2:
+        self.sec_value = self.sec_expression.eval(sec_expression)
+        fst_matching = re.search(AppConstant.NUMERICAL_REGEX, str(self.value))
+        sec_matching = re.search(AppConstant.NUMERICAL_REGEX, str(self.sec_value))
+        if fst_matching and sec_matching:
             import math
-            self.value = math.pow(self.value, self.value2)
+            self.value = math.pow(self.value, self.sec_value)
             return self.value
         else:
-            raise ValueError("Cannot pow() not numerical values !")
+            raise ValueError(MessageEnum.EAST002.value % self.__class__.__name__.upper())
 
     def rep(self):
-        return 'Pow(%s)' % self.value
+        return AppConstant.COMMON_FUNCTION_REP % (self.__class__.__name__, self.value)
 
 
-# ABSTRACT CLASS! DO NOT USE!
 class Constant(BaseBox):
     def __init__(self, state):
         self.value = None
@@ -305,7 +315,7 @@ class Constant(BaseBox):
     def eval(self, node):
         value = Node(self.value)
         typed = Node(self.__class__.__name__.upper(), [value])
-        constant = Node("const", [typed])
+        constant = Node(AppConstant.CONSTANT_NODE_NAME, [typed])
         node.children.extend([constant])
         return self.value
 
@@ -313,22 +323,22 @@ class Constant(BaseBox):
         return str(self.value)
 
     def rep(self):
-        return 'Constant(%s)' % self.value
+        return AppConstant.COMMON_FUNCTION_REP % (self.__class__.__name__, self.value)
 
 
 class Boolean(Constant):
     def __init__(self, value, state):
         super().__init__(state)
-        if ["true", "false", "True", "False", "TRUE", "FALSE", ].__contains__(value):
-            if value.lower().__eq__("true"):
+        if AppConstant.BOOLEAN_VALUES_ACCEPTED.__contains__(value):
+            if value.lower().__eq__(AppConstant.BOOLEAN_TRUE_LOWER):
                 self.value = True
-            if value.lower().__eq__("false"):
+            if value.lower().__eq__(AppConstant.BOOLEAN_FALSE_LOWER):
                 self.value = False
         else:
-            raise TypeError("Cannot cast boolean value while initiating Constant !")
+            raise TypeError(MessageEnum.EAST004)
 
     def rep(self):
-        return 'Boolean(%s)' % self.value
+        return AppConstant.COMMON_FUNCTION_REP % (self.__class__.__name__, self.value)
 
 
 class Integer(Constant):
@@ -337,7 +347,7 @@ class Integer(Constant):
         self.value = int(value)
 
     def rep(self):
-        return 'Integer(%s)' % self.value
+        return AppConstant.COMMON_FUNCTION_REP % (self.__class__.__name__, self.value)
 
 
 class Float(Constant):
@@ -346,7 +356,7 @@ class Float(Constant):
         self.value = float(value)
 
     def rep(self):
-        return 'Float(%s)' % self.value
+        return AppConstant.COMMON_FUNCTION_REP % (self.__class__.__name__, self.value)
 
 
 class String(Constant):
@@ -358,10 +368,10 @@ class String(Constant):
         return '"%s"' % str(self.value)
 
     def rep(self):
-        return 'String("%s")' % self.value
+        return AppConstant.COMMON_FUNCTION_REP % (self.__class__.__name__, self.value)
 
 
-class ConstantPI(Constant):
+class MathConstPI(Constant):
     def __init__(self, name, state):
         super().__init__(state)
         import math
@@ -372,21 +382,21 @@ class ConstantPI(Constant):
             self.value = float(math.pi)
 
     def rep(self):
-        return '%s(%f)' % (self.name, self.value)
+        return AppConstant.COMMON_FUNCTION_REP % (self.__class__.__name__, self.value)
 
 
-class ConstantE(Constant):
+class MathConstE(Constant):
     def __init__(self, name, state):
         super().__init__(state)
         import math
         self.name = str(name)
-        if str(name).__contains__('-'):
+        if str(name).__contains__(AppConstant.DASH_SIGN):
             self.value = float(-math.e)
         else:
             self.value = float(math.e)
 
     def rep(self):
-        return '%s(%f)' % (self.name, self.value)
+        return AppConstant.COMMON_FUNCTION_REP % (self.__class__.__name__, self.value)
 
 
 class BinaryOp(BaseBox):
@@ -401,116 +411,116 @@ class Assignment(BinaryOp):
         if isinstance(self.left, Variable):
             var_name = self.left.get_name()
             if dict(self.state.variables).get(var_name) is None:
-                identifier = Node("IDENTIFIER", [Node(var_name)])
-                expression = Node("expression")
-                node.children.extend([Node("LET"), identifier, Node("="), expression])
+                identifier = Node(AppConstant.IDENTIFIER_NODE_NAME, [Node(var_name)])
+                expression = Node(AppConstant.EXPRESSION_NODE_NAME)
+                node.children.extend([Node(AppConstant.LET_NODE_NAME), identifier,
+                                      Node(AppConstant.ASSIGN_SIGN), expression])
                 self.state.variables[var_name] = self.right.eval(expression)
-                # print(self.state.variables)
-                return self.state.variables  # Return the ParserState() that hold the variables.
+                return self.state.variables
 
             # Otherwise raise error
             raise ImmutableError(var_name)
 
         else:
-            raise LogicError("Cannot assign to <%s>" % self)
+            raise LogicError(MessageEnum.EAST003 % self)
 
     def rep(self):
-        return 'Assignment(%s, %s)' % (self.left.rep(), self.right.rep())
+        return AppConstant.FUNCTION_REP_THREE_PARAMS % (self.__class__.__name__, self.left.rep(), self.right.rep())
 
 
 class Sum(BinaryOp):
     def eval(self, node):
-        left = Node("expression")
-        right = Node("expression")
-        node.children.extend([left, Node("+"), right])
+        left = Node(AppConstant.EXPRESSION_NODE_NAME)
+        right = Node(AppConstant.EXPRESSION_NODE_NAME)
+        node.children.extend([left, Node(AppConstant.SUM_SIGN), right])
         return self.left.eval(left) + self.right.eval(right)
 
 
 class Sub(BinaryOp):
     def eval(self, node):
-        left = Node("expression")
-        right = Node("expression")
-        node.children.extend([left, Node("-"), right])
+        left = Node(AppConstant.EXPRESSION_NODE_NAME)
+        right = Node(AppConstant.EXPRESSION_NODE_NAME)
+        node.children.extend([left, Node(AppConstant.SUB_SIGN), right])
         return self.left.eval(left) - self.right.eval(right)
 
 
 class Mul(BinaryOp):
     def eval(self, node):
-        left = Node("expression")
-        right = Node("expression")
-        node.children.extend([left, Node("*"), right])
+        left = Node(AppConstant.EXPRESSION_NODE_NAME)
+        right = Node(AppConstant.EXPRESSION_NODE_NAME)
+        node.children.extend([left, Node(AppConstant.MUL_SIGN), right])
         return self.left.eval(left) * self.right.eval(right)
 
 
 class Div(BinaryOp):
     def eval(self, node):
-        left = Node("expression")
-        right = Node("expression")
-        node.children.extend([left, Node("/"), right])
+        left = Node(AppConstant.EXPRESSION_NODE_NAME)
+        right = Node(AppConstant.EXPRESSION_NODE_NAME)
+        node.children.extend([left, Node(AppConstant.DIV_SIGN), right])
         return self.left.eval(left) / self.right.eval(right)
 
 
 class Equal(BinaryOp):
     def eval(self, node):
-        left = Node("expression")
-        right = Node("expression")
-        node.children.extend([left, Node("=="), right])
+        left = Node(AppConstant.EXPRESSION_NODE_NAME)
+        right = Node(AppConstant.EXPRESSION_NODE_NAME)
+        node.children.extend([left, Node(AppConstant.EQUAL_SIGN), right])
         return self.left.eval(left) == self.right.eval(right)
 
 
 class NotEqual(BinaryOp):
     def eval(self, node):
-        left = Node("expression")
-        right = Node("expression")
-        node.children.extend([left, Node("!="), right])
+        left = Node(AppConstant.EXPRESSION_NODE_NAME)
+        right = Node(AppConstant.EXPRESSION_NODE_NAME)
+        node.children.extend([left, Node(AppConstant.NOT_EQUAL_SIGN), right])
         return self.left.eval(left) != self.right.eval(right)
 
 
 class GreaterThan(BinaryOp):
     def eval(self, node):
-        left = Node("expression")
-        right = Node("expression")
-        node.children.extend([left, Node(">"), right])
+        left = Node(AppConstant.EXPRESSION_NODE_NAME)
+        right = Node(AppConstant.EXPRESSION_NODE_NAME)
+        node.children.extend([left, Node(AppConstant.GREATER_THAN_SIGN), right])
         return self.left.eval(left) > self.right.eval(right)
 
 
 class LessThan(BinaryOp):
     def eval(self, node):
-        left = Node("expression")
-        right = Node("expression")
-        node.children.extend([left, Node("<"), right])
+        left = Node(AppConstant.EXPRESSION_NODE_NAME)
+        right = Node(AppConstant.EXPRESSION_NODE_NAME)
+        node.children.extend([left, Node(AppConstant.LESS_THAN_SIGN), right])
         return self.left.eval(left) < self.right.eval(right)
 
 
 class GreaterThanEqual(BinaryOp):
     def eval(self, node):
-        left = Node("expression")
-        right = Node("expression")
-        node.children.extend([left, Node(">="), right])
+        left = Node(AppConstant.EXPRESSION_NODE_NAME)
+        right = Node(AppConstant.EXPRESSION_NODE_NAME)
+        node.children.extend([left, Node(AppConstant.GREATER_THAN_EQUAL_SIGN), right])
         return self.left.eval(left) >= self.right.eval(right)
 
 
 class LessThanEqual(BinaryOp):
     def eval(self, node):
-        left = Node("expression")
-        right = Node("expression")
-        node.children.extend([left, Node("<="), right])
+        left = Node(AppConstant.EXPRESSION_NODE_NAME)
+        right = Node(AppConstant.EXPRESSION_NODE_NAME)
+        node.children.extend([left, Node(AppConstant.LESS_THAN__EQUAL_SIGN), right])
         return self.left.eval(left) <= self.right.eval(right)
 
 
 class And(BinaryOp):
     def eval(self, node):
-        left = Node("expression")
-        right = Node("expression")
-        node.children.extend([left, Node("and"), right])
+        left = Node(AppConstant.EXPRESSION_NODE_NAME)
+        right = Node(AppConstant.EXPRESSION_NODE_NAME)
+        node.children.extend([left, Node(AppConstant.AND_NODE_NAME), right])
         return self.left.eval(left) and self.right.eval(right)
 
 
 class Or(BinaryOp):
     def eval(self, node):
-        left = Node("expression")
-        right = Node("expression")
-        node.children.extend([left, Node("or"), right])
+        left = Node(AppConstant.EXPRESSION_NODE_NAME)
+        right = Node(AppConstant.EXPRESSION_NODE_NAME)
+        node.children.extend([left, Node(AppConstant.OR_NODE_NAME), right])
         return self.left.eval(left) or self.right.eval(right)
 
 
@@ -520,12 +530,12 @@ class Not(BaseBox):
         self.state = state
 
     def eval(self, node):
-        expression = Node("expression")
-        node.children.extend([Node("Not"), expression])
+        expression = Node(AppConstant.EXPRESSION_NODE_NAME)
+        node.children.extend([Node(AppConstant.NOT_NODE_NAME), expression])
         self.value = self.value.eval(expression)
         if isinstance(self.value, bool):
             return not bool(self.value)
-        raise LogicError("Cannot 'not' that")
+        raise LogicError(MessageEnum.EAST005)
 
 
 class Print(BaseBox):
@@ -535,21 +545,21 @@ class Print(BaseBox):
         self.state = state
 
     def eval(self, node):
-        node.children.extend([Node("PRINT"), Node("(")])
+        node.children.extend([Node(AppConstant.PRINT_NODE_NAME), Node('(')])
         if self.first_expression is None:
             print()
         elif self.second_expression is None:
-            expression = Node("expression")
+            expression = Node(AppConstant.EXPRESSION_NODE_NAME)
             node.children.extend([expression])
             print(self.first_expression.eval(expression))
         else:
-            fst_expression = Node("expression")
+            fst_expression = Node(AppConstant.EXPRESSION_NODE_NAME)
             node.children.extend([fst_expression])
-            node.children.extend([Node(",")])
-            sec_expression = Node("expression")
+            node.children.extend([Node(AppConstant.COMMA_SIGN)])
+            sec_expression = Node(AppConstant.EXPRESSION_NODE_NAME)
             node.children.extend([sec_expression])
             print(self.first_expression.eval(fst_expression), self.second_expression.eval(sec_expression))
-        node.children.extend([Node(")")])
+        node.children.extend([Node(')')])
 
 
 class Input(BaseBox):
@@ -558,16 +568,16 @@ class Input(BaseBox):
         self.state = state
 
     def eval(self, node):
-        node.children.extend([Node("INPUTTER"), Node("(")])
+        node.children.extend([Node(AppConstant.INPUTTER_NODE_NAME), Node('(')])
         if self.value is None:
             result = input()
         else:
-            expression = Node("expression")
+            expression = Node(AppConstant.EXPRESSION_NODE_NAME)
             node.children.extend([expression])
             result = input(self.value.eval(expression))
-        node.children.extend([Node(")")])
-        import re as regex
-        if regex.search('^-?\d+(\.\d+)?$', str(result)):
+        node.children.extend([Node(')')])
+        import re
+        if re.search(AppConstant.NUMERICAL_REGEX, str(result)):
             return float(result)
         else:
             return str(result)
@@ -578,7 +588,7 @@ class Main(BaseBox):
         self.program = program
 
     def eval(self, node):
-        program = Node("program")
+        program = Node(AppConstant.PROGRAM_NODE_NAME)
         node.children.extend([program])
         return self.program.eval(program)
 
@@ -588,8 +598,8 @@ class ExpressParenthesis(BaseBox):
         self.expression = expression
 
     def eval(self, node):
-        expression = Node("expression")
-        node.children.extend([Node("("), expression, Node(")")])
+        expression = Node(AppConstant.EXPRESSION_NODE_NAME)
+        node.children.extend([Node('('), expression, Node(')')])
         return self.expression.eval(expression)
 
 
@@ -598,8 +608,8 @@ class StatementFull(BaseBox):
         self.statement = statement
 
     def eval(self, node):
-        statement = Node("statement")
-        node.children.extend([statement, Node(";")])
+        statement = Node(AppConstant.STATEMENT_NODE_NAME)
+        node.children.extend([statement, Node(AppConstant.SEMI_COLON_SIGN)])
         return self.statement.eval(statement)
 
 
@@ -608,6 +618,6 @@ class Statement(BaseBox):
         self.expression = expression
 
     def eval(self, node):
-        expression = Node("expression")
+        expression = Node(AppConstant.EXPRESSION_NODE_NAME)
         node.children.extend([expression])
         return self.expression.eval(expression)

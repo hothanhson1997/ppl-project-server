@@ -22,16 +22,16 @@ import traceback
 with open('sample/FirstSample.lang', 'r') as file:
     file_content = file.read()
 
-lexer = Lexer().build_lexer()  # Build the lexer using LexerGenerator
+lexer = Lexer().build_lexer()
 tokens: LexerStream
 try:
     print("------- Lexical Analysis - START -------")
-    tokens = lexer.lex(file_content)  # Stream the input to analysis the lexical syntax
+    tokens = lexer.lex(file_content)
     pprint(list(copy(tokens)))
 except (BaseException, Exception):
     traceback.print_exc()
 finally:
-    print("------- Lexical Analysis - END -------s")
+    print("------- Lexical Analysis - END -------")
 
 SymbolTable = ParserState()
 syntaxRoot: Node
